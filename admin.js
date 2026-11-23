@@ -1,244 +1,356 @@
+
+"use strict";
+
+// ==========================================
+// POGA KSA ADMIN DASHBOARD
+// SUPABASE CONFIGURATION
+// ==========================================
+
 const SUPABASE_URL = "https://rocvqcqgbdohfwfkhncy.supabase.co";
+
 const SUPABASE_KEY = "sb_publishable_wStACVHPYgU82oxbsvAWTg_EdkHrQaF";
+
+const PHOTO_BUCKET = "member-photos";
+
+// ==========================================
+// INITIALIZATION
+// ==========================================
+
+const $ = (id) => document.getElementById(id);
+
+const loginSection = $("loginSection");
+const loginForm = $("loginForm");
+const loginEmail = $("loginEmail");
+const loginPassword = $("loginPassword");
+const loginButton = $("loginButton");
+const loginError = $("loginError");
+
+const dashboardSection = $("dashboardSection");
+const adminEmail = $("adminEmail");
+const logoutButton = $("logoutButton");
+
+const memberForm = $("memberForm");
+const formTitle = $("formTitle");
+
+const memberId = $("memberId");
+const fullName = $("fullName");
+const passportNumber = $("passportNumber");
+const birthday = $("birthday");
+const country = $("country");
+const address = $("address");
+const contact = $("contact");
+const emergencyContact = $("emergencyContact");
+const emergencyNumber = $("emergencyNumber");
+const status = $("status");
+
+const photo = $("photo");
+const photoPreview = $("photoPreview");
+
+const saveButton = $("saveButton");
+const cancelEditButton = $("cancelEditButton");
+
+const searchInput = $("searchInput");
+const membersTableBody = $("membersTableBody");
+const printAllMembersButton = $("printAllMembersButton");
+
+const memberDetailsModal = $("memberDetailsModal");
+const closeDetailsButton = $("closeDetailsButton");
+const detailsPhoto = $("detailsPhoto");
+
+const detailsMemberId = $("detailsMemberId");
+const detailsFullName = $("detailsFullName");
+const detailsPassport = $("detailsPassport");
+const detailsBirthday = $("detailsBirthday");
+const detailsCountry = $("detailsCountry");
+const detailsContact = $("detailsContact");
+const detailsAddress = $("detailsAddress");
+const detailsEmergencyPerson = $("detailsEmergencyPerson");
+const detailsEmergencyNumber = $("detailsEmergencyNumber");
+const detailsStatus = $("detailsStatus");
+
+const detailsPrintButton = $("detailsPrintButton");
+const detailsEditButton = $("detailsEditButton");
+const detailsCloseButton = $("detailsCloseButton");
+
+// ==========================================
+// CHECK REQUIRED ELEMENTS
+// ==========================================
+
+if (!loginForm || !memberForm || !dashboardSection) {
+  console.error("Admin HTML elements are missing.");
+  throw new Error("Please check your admin.html file.");
+}
+
+if (!window.supabase) {
+  loginError.textContent =
+    "Unable to connect to Supabase. Please refresh the page and check your internet connection.";
+
+  loginError.classList.remove("hidden");
+
+  throw new Error("Supabase library failed to load.");
+}
+
+// ==========================================
+// CREATE SUPABASE CLIENT
+// ==========================================
 
 const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_KEY
 );
 
-const PHOTO_BUCKET = "member-photos";
-const LOGO_URL = new URL("poga-ksa-logo.png", window.location.href).href;
-const SAUDI_FLAG_URL = new URL("saudi-flag.svg", window.location.href).href;
-const PH_FLAG_URL = new URL("philippines-flag.svg", window.location.href).href;
-
-// =========================
-// LOGIN ELEMENTS
-// =========================
-
-const loginSection = document.getElementById("loginSection");
-const loginForm = document.getElementById("loginForm");
-const loginEmail = document.getElementById("loginEmail");
-const loginPassword = document.getElementById("loginPassword");
-const loginButton = document.getElementById("loginButton");
-const loginError = document.getElementById("loginError");
-
-// =========================
-// DASHBOARD ELEMENTS
-// =========================
-
-const dashboardSection = document.getElementById("dashboardSection");
-const adminEmail = document.getElementById("adminEmail");
-const logoutButton = document.getElementById("logoutButton");
-
-// =========================
-// FORM ELEMENTS
-// =========================
-
-const memberForm = document.getElementById("memberForm");
-const formTitle = document.getElementById("formTitle");
-
-const memberId = document.getElementById("memberId");
-const fullName = document.getElementById("fullName");
-const passportNumber = document.getElementById("passportNumber");
-const birthday = document.getElementById("birthday");
-const country = document.getElementById("country");
-const address = document.getElementById("address");
-const contact = document.getElementById("contact");
-const emergencyContact = document.getElementById("emergencyContact");
-const emergencyNumber = document.getElementById("emergencyNumber");
-const status = document.getElementById("status");
-
-const photo = document.getElementById("photo");
-const photoPreview = document.getElementById("photoPreview");
-
-const saveButton = document.getElementById("saveButton");
-const cancelEditButton = document.getElementById("cancelEditButton");
-
-// =========================
-// RECORDS ELEMENTS
-// =========================
-
-const searchInput = document.getElementById("searchInput");
-const membersTableBody = document.getElementById("membersTableBody");
-const printAllMembersButton = document.getElementById("printAllMembersButton");
-
-// =========================
-// DETAILS MODAL ELEMENTS
-// =========================
-
-const memberDetailsModal = document.getElementById("memberDetailsModal");
-const closeDetailsButton = document.getElementById("closeDetailsButton");
-
-const detailsPhoto = document.getElementById("detailsPhoto");
-const detailsMemberId = document.getElementById("detailsMemberId");
-const detailsFullName = document.getElementById("detailsFullName");
-const detailsPassport = document.getElementById("detailsPassport");
-const detailsBirthday = document.getElementById("detailsBirthday");
-const detailsCountry = document.getElementById("detailsCountry");
-const detailsContact = document.getElementById("detailsContact");
-const detailsAddress = document.getElementById("detailsAddress");
-const detailsEmergencyPerson = document.getElementById(
-  "detailsEmergencyPerson"
-);
-const detailsEmergencyNumber = document.getElementById(
-  "detailsEmergencyNumber"
-);
-const detailsStatus = document.getElementById("detailsStatus");
-
-const detailsPrintButton = document.getElementById("detailsPrintButton");
-const detailsEditButton = document.getElementById("detailsEditButton");
-const detailsCloseButton = document.getElementById("detailsCloseButton");
-
-// =========================
+// ==========================================
 // VARIABLES
-// =========================
+// ==========================================
 
 let editingId = null;
 let currentPhotoUrl = null;
 let selectedPhotoFile = null;
 let currentDetailsMemberId = null;
+let currentMembers = [];
+let isLoadingMembers = false;
 
-// =========================
-// AUTHENTICATION
-// =========================
+// ==========================================
+// GENERAL HELPERS
+// ==========================================
 
-async function checkAuth() {
-  const {
-    data: { session },
-  } = await supabaseClient.auth.getSession();
-
-  if (session) {
-    showDashboard(session.user);
-  } else {
-    showLogin();
-  }
+function escapeHTML(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
+
+function showMessage(element, message) {
+  if (!element) return;
+
+  element.textContent = message;
+  element.classList.remove("hidden");
+}
+
+function hideMessage(element) {
+  if (!element) return;
+
+  element.textContent = "";
+  element.classList.add("hidden");
+}
+
+function formatDate(dateString) {
+  if (!dateString) return "-";
+
+  const date = new Date(dateString);
+
+  if (Number.isNaN(date.getTime())) {
+    return dateString;
+  }
+
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric"
+  });
+}
+
+function sortMembers(data) {
+  return data.sort((a, b) => {
+    const numberA = parseInt(a.member_id, 10);
+    const numberB = parseInt(b.member_id, 10);
+
+    if (!Number.isNaN(numberA) && !Number.isNaN(numberB)) {
+      return numberA - numberB;
+    }
+
+    return String(a.member_id || "").localeCompare(
+      String(b.member_id || ""),
+      undefined,
+      {
+        numeric: true,
+        sensitivity: "base"
+      }
+    );
+  });
+}
+
+function escapeSearchValue(value) {
+  return String(value ?? "")
+    .replace(/[%_]/g, "\\$&")
+    .replace(/,/g, "\\,")
+    .replace(/\./g, "\\.");
+}
+
+// ==========================================
+// AUTHENTICATION
+// ==========================================
 
 function showLogin() {
   loginSection.classList.remove("hidden");
   dashboardSection.classList.add("hidden");
 
-  if (adminEmail) {
-    adminEmail.textContent = "";
-  }
+  adminEmail.textContent = "";
+
+  loginPassword.value = "";
 }
 
 async function showDashboard(user) {
   loginSection.classList.add("hidden");
   dashboardSection.classList.remove("hidden");
 
-  if (adminEmail) {
-    adminEmail.textContent = user.email || "";
-  }
+  adminEmail.textContent = user.email || "";
 
   await loadMembers();
 }
 
-// =========================
-// LOGIN
-// =========================
+async function checkAuth() {
+  try {
+    const { data, error } =
+      await supabaseClient.auth.getSession();
 
-loginForm.addEventListener("submit", async function (event) {
+    if (error) throw error;
+
+    if (data.session) {
+      await showDashboard(data.session.user);
+    } else {
+      showLogin();
+    }
+
+  } catch (error) {
+    console.error("Authentication error:", error);
+
+    showLogin();
+
+    showMessage(
+      loginError,
+      "Unable to check login session: " + error.message
+    );
+  }
+}
+
+// ==========================================
+// ADMIN LOGIN
+// ==========================================
+
+loginForm.addEventListener("submit", async function(event) {
   event.preventDefault();
 
-  loginError.textContent = "";
-  loginButton.disabled = true;
-  loginButton.textContent = "Logging in...";
+  hideMessage(loginError);
 
   const email = loginEmail.value.trim();
   const password = loginPassword.value;
 
-  const { data, error } = await supabaseClient.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  loginButton.disabled = false;
-  loginButton.textContent = "Login";
-
-  if (error) {
-    loginError.textContent = error.message;
+  if (!email || !password) {
+    showMessage(loginError, "Please enter your email and password.");
     return;
   }
 
-  if (data.session) {
+  loginButton.disabled = true;
+  loginButton.textContent = "Logging in...";
+
+  try {
+    const { data, error } =
+      await supabaseClient.auth.signInWithPassword({
+        email: email,
+        password: password
+      });
+
+    if (error) throw error;
+
+    if (!data.session) {
+      throw new Error("Login session was not created.");
+    }
+
     await showDashboard(data.user);
+
+  } catch (error) {
+    console.error("Login failed:", error);
+
+    showMessage(
+      loginError,
+      error.message || "Login failed. Please try again."
+    );
+
+  } finally {
+    loginButton.disabled = false;
+    loginButton.textContent = "Login";
   }
 });
 
-// =========================
-// LOGOUT
-// =========================
+// ==========================================
+// ADMIN LOGOUT
+// ==========================================
 
-logoutButton.addEventListener("click", async function () {
-  const { error } = await supabaseClient.auth.signOut();
+logoutButton.addEventListener("click", async function() {
+  logoutButton.disabled = true;
 
-  if (error) {
+  try {
+    const { error } = await supabaseClient.auth.signOut();
+
+    if (error) throw error;
+
+    showLogin();
+
+  } catch (error) {
     alert("Logout failed: " + error.message);
-    return;
-  }
 
-  showLogin();
+  } finally {
+    logoutButton.disabled = false;
+  }
 });
 
-// =========================
-// AUTH STATE
-// =========================
+// ==========================================
+// AUTH SESSION CHANGES
+// ==========================================
 
-supabaseClient.auth.onAuthStateChange(async (event, session) => {
-  if (event === "SIGNED_IN" && session) {
-    await showDashboard(session.user);
-  }
-
+supabaseClient.auth.onAuthStateChange((event) => {
   if (event === "SIGNED_OUT") {
     showLogin();
   }
 });
 
-// =========================
+// ==========================================
 // PHOTO VALIDATION
-// =========================
+// ==========================================
 
-photo.addEventListener("change", function () {
+photo.addEventListener("change", function() {
   const file = photo.files[0];
 
   selectedPhotoFile = null;
 
-  if (!file) {
-    return;
-  }
+  if (!file) return;
 
   if (!file.type.startsWith("image/")) {
-    alert("Please select an image file.");
+    alert("Please select a valid image.");
+
     photo.value = "";
     return;
   }
 
-  const maxSize = 5 * 1024 * 1024;
-
-  if (file.size > maxSize) {
+  if (file.size > 5 * 1024 * 1024) {
     alert("Photo must be 5MB or smaller.");
+
     photo.value = "";
     return;
   }
 
   selectedPhotoFile = file;
+
   showPhotoPreview(file);
 });
 
-// =========================
+// ==========================================
 // PHOTO PREVIEW
-// =========================
+// ==========================================
 
 function showPhotoPreview(file) {
   const reader = new FileReader();
 
-  reader.onload = function (event) {
+  reader.onload = function(event) {
     photoPreview.innerHTML = `
       <img
         src="${event.target.result}"
-        alt="Photo Preview"
         class="member-photo"
+        alt="Member Photo"
       >
     `;
   };
@@ -246,101 +358,95 @@ function showPhotoPreview(file) {
   reader.readAsDataURL(file);
 }
 
-// =========================
-// UPLOAD PHOTO
-// =========================
+// ==========================================
+// PHOTO STORAGE PATH
+// ==========================================
 
-
-function getPhotoStoragePath(photoValue) {
-  if (!photoValue) return null;
-
-  let value = String(photoValue).trim();
+function getPhotoStoragePath(value) {
   if (!value) return null;
 
-  // Already a storage path.
-  if (!/^https?:\/\//i.test(value)) {
-    value = value.replace(/^\/+/, "");
-    if (value.startsWith(`${PHOTO_BUCKET}/`)) {
-      value = value.slice(PHOTO_BUCKET.length + 1);
+  let photoValue = String(value).trim();
+
+  if (!photoValue) return null;
+
+  if (!/^https?:\/\//i.test(photoValue)) {
+    photoValue = photoValue.replace(/^\/+/, "");
+
+    if (photoValue.startsWith(PHOTO_BUCKET + "/")) {
+      photoValue = photoValue.slice(PHOTO_BUCKET.length + 1);
     }
-    return value || null;
+
+    return photoValue || null;
   }
 
   try {
-    const url = new URL(value);
+    const url = new URL(photoValue);
+
     const markers = [
       `/storage/v1/object/public/${PHOTO_BUCKET}/`,
       `/storage/v1/object/sign/${PHOTO_BUCKET}/`,
-      `/storage/v1/object/download/${PHOTO_BUCKET}/`,
+      `/storage/v1/object/download/${PHOTO_BUCKET}/`
     ];
 
     for (const marker of markers) {
       const index = url.pathname.indexOf(marker);
+
       if (index !== -1) {
         return decodeURIComponent(
           url.pathname.slice(index + marker.length)
         ).replace(/^\/+/, "");
       }
     }
+
   } catch (error) {
-    console.error("Unable to read photo URL:", error);
+    console.error(error);
   }
 
   return null;
 }
 
-async function getSignedPhotoUrl(photoValue) {
-  if (!photoValue) return null;
+// ==========================================
+// GET PHOTO URL
+// ==========================================
 
-  const storagePath = getPhotoStoragePath(photoValue);
+async function resolveMemberPhoto(value) {
+  if (!value) return null;
 
-  // If the database contains a normal web URL and we cannot extract a
-  // storage path, try that URL directly.
-  if (!storagePath) {
-    const raw = String(photoValue).trim();
-    return /^https?:\/\//i.test(raw) ? raw : null;
+  const path = getPhotoStoragePath(value);
+
+  if (!path) {
+    return /^https?:\/\//i.test(String(value))
+      ? String(value)
+      : null;
   }
 
-  // First try a signed URL. This works for a private bucket.
   const { data: signedData, error: signedError } =
     await supabaseClient.storage
       .from(PHOTO_BUCKET)
-      .createSignedUrl(storagePath, 3600);
+      .createSignedUrl(path, 3600);
 
   if (signedData?.signedUrl) {
     return signedData.signedUrl;
   }
 
   if (signedError) {
-    console.warn("Signed photo URL failed:", signedError.message);
+    console.warn(signedError.message);
   }
 
-  // Fallback for installations where the bucket is public.
-  try {
-    const { data: publicData } = supabaseClient.storage
+  const { data: publicData } =
+    supabaseClient.storage
       .from(PHOTO_BUCKET)
-      .getPublicUrl(storagePath);
+      .getPublicUrl(path);
 
-    if (publicData?.publicUrl) {
-      return publicData.publicUrl;
-    }
-  } catch (error) {
-    console.warn("Public photo URL failed:", error);
-  }
-
-  // Last fallback: preserve an existing direct URL if one was stored.
-  const raw = String(photoValue).trim();
-  return /^https?:\/\//i.test(raw) ? raw : null;
+  return publicData?.publicUrl || null;
 }
 
-async function resolveMemberPhoto(photoValue) {
-  return await getSignedPhotoUrl(photoValue);
-}
+// ==========================================
+// UPLOAD MEMBER PHOTO
+// ==========================================
 
 async function uploadPhoto(file) {
-  if (!file) {
-    return null;
-  }
+  if (!file) return null;
 
   const extension = file.name.split(".").pop().toLowerCase();
 
@@ -355,26 +461,23 @@ async function uploadPhoto(file) {
     "." +
     safeExtension;
 
-  const { error: uploadError } = await supabaseClient.storage
+  const { error } = await supabaseClient.storage
     .from(PHOTO_BUCKET)
     .upload(fileName, file, {
       cacheControl: "3600",
-      upsert: false,
+      upsert: false
     });
 
-  if (uploadError) {
-    throw uploadError;
-  }
+  if (error) throw error;
 
-  // The bucket is private. Store only the storage path.
   return fileName;
 }
 
-// =========================
-// FORM DATA
-// =========================
+// ==========================================
+// GET MEMBER FORM DATA
+// ==========================================
 
-function getFormData(photoUrl = null) {
+function getFormData(photoUrl) {
   return {
     member_id: memberId.value.trim(),
     full_name: fullName.value.trim(),
@@ -386,154 +489,112 @@ function getFormData(photoUrl = null) {
     emergency_contact_person: emergencyContact.value.trim(),
     emergency_contact_number: emergencyNumber.value.trim(),
     membership_status: status.value,
-    photo_url: photoUrl,
+    photo_url: photoUrl
   };
 }
 
-// =========================
+// ==========================================
 // ADD / UPDATE MEMBER
-// =========================
+// ==========================================
 
-memberForm.addEventListener("submit", async function (event) {
+memberForm.addEventListener("submit", async function(event) {
   event.preventDefault();
 
   saveButton.disabled = true;
+
   saveButton.textContent = editingId
     ? "Updating..."
     : "Saving...";
 
   try {
-    // =========================
-    // ADD MEMBER
-    // =========================
+    let photoUrl = currentPhotoUrl;
 
-    if (!editingId) {
-      if (!selectedPhotoFile) {
-        alert("Please select a member photo.");
-        saveButton.disabled = false;
-        saveButton.textContent = "Save Member";
-        return;
-      }
-
-      const photoUrl = await uploadPhoto(selectedPhotoFile);
-
-      const memberData = getFormData(photoUrl);
-
-      const { error } = await supabaseClient
-        .from("members")
-        .insert([memberData]);
-
-      if (error) {
-        throw error;
-      }
-
-      alert("Member added successfully.");
-
-      resetForm();
-      await loadMembers();
+    if (selectedPhotoFile) {
+      photoUrl = await uploadPhoto(selectedPhotoFile);
     }
 
-    // =========================
-    // UPDATE MEMBER
-    // =========================
+    if (!editingId && !photoUrl) {
+      throw new Error("Please select a member photo.");
+    }
 
-    else {
-      let photoUrl = currentPhotoUrl;
+    const memberData = getFormData(photoUrl);
 
-      if (selectedPhotoFile) {
-        photoUrl = await uploadPhoto(selectedPhotoFile);
-      }
-
-      const memberData = getFormData(photoUrl);
-
+    if (editingId) {
       const { error } = await supabaseClient
         .from("members")
         .update(memberData)
         .eq("id", editingId);
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       alert("Member updated successfully.");
 
-      resetForm();
-      await loadMembers();
-    }
-  } catch (error) {
-    console.error(error);
-    alert("Error: " + error.message);
-  }
+    } else {
+      const { error } = await supabaseClient
+        .from("members")
+        .insert([memberData]);
 
-  saveButton.disabled = false;
-  saveButton.textContent = "Save Member";
+      if (error) throw error;
+
+      alert("Member added successfully.");
+    }
+
+    resetForm();
+
+    await loadMembers();
+
+  } catch (error) {
+    console.error("Member save error:", error);
+
+    alert("Unable to save member: " + error.message);
+
+  } finally {
+    saveButton.disabled = false;
+
+    saveButton.textContent = editingId
+      ? "Update Member"
+      : "Save Member";
+  }
 });
 
-// =========================
+// ==========================================
 // LOAD MEMBERS
-// =========================
+// ==========================================
 
 async function loadMembers() {
-  const { data, error } = await supabaseClient
-    .from("members")
-    .select("*");
+  if (isLoadingMembers) return;
 
-  if (error) {
-    console.error(error);
+  isLoadingMembers = true;
+
+  try {
+    const { data, error } = await supabaseClient
+      .from("members")
+      .select("*");
+
+    if (error) throw error;
+
+    currentMembers = sortMembers(data || []);
+
+    await displayMembers(currentMembers);
+
+  } catch (error) {
+    console.error("Load members error:", error);
+
     alert("Unable to load members: " + error.message);
-    return;
+
+  } finally {
+    isLoadingMembers = false;
   }
-
-  /*
-    IMPORTANT:
-    Member ID is stored as TEXT.
-
-    Example:
-    001
-    002
-    003
-    010
-    011
-    100
-
-    We convert the Member ID to a number
-    ONLY for sorting.
-
-    This keeps the displayed value exactly as
-    001, 002, 003, etc.
-  */
-
-  data.sort((a, b) => {
-    const numberA = parseInt(a.member_id, 10);
-    const numberB = parseInt(b.member_id, 10);
-
-    // Normal numeric sorting
-    if (!Number.isNaN(numberA) && !Number.isNaN(numberB)) {
-      return numberA - numberB;
-    }
-
-    // Fallback if a Member ID is not numeric
-    return String(a.member_id || "").localeCompare(
-      String(b.member_id || ""),
-      undefined,
-      {
-        numeric: true,
-        sensitivity: "base",
-      }
-    );
-  });
-
-  displayMembers(data);
 }
 
-// =========================
+// ==========================================
 // DISPLAY MEMBERS
-// =========================
+// ==========================================
 
 async function displayMembers(members) {
   membersTableBody.innerHTML = "";
 
-  if (!members || members.length === 0) {
+  if (!members.length) {
     membersTableBody.innerHTML = `
       <tr>
         <td colspan="8" class="empty">
@@ -541,25 +602,24 @@ async function displayMembers(members) {
         </td>
       </tr>
     `;
+
     return;
   }
 
   for (const member of members) {
     const row = document.createElement("tr");
 
-    let photoCell = `
-      <div class="no-photo">
-        No Photo
-      </div>
+    let photoHTML = `
+      <div class="no-photo">No Photo</div>
     `;
 
     if (member.photo_url) {
-      const signedUrl = await resolveMemberPhoto(member.photo_url);
+      const url = await resolveMemberPhoto(member.photo_url);
 
-      if (signedUrl) {
-        photoCell = `
+      if (url) {
+        photoHTML = `
           <img
-            src="${escapeHTML(signedUrl)}"
+            src="${escapeHTML(url)}"
             alt="Member Photo"
             class="member-photo"
           >
@@ -568,58 +628,45 @@ async function displayMembers(members) {
     }
 
     row.innerHTML = `
-      <td>${photoCell}</td>
+      <td>${photoHTML}</td>
 
-      <td>
-        ${escapeHTML(member.member_id || "")}
-      </td>
+      <td>${escapeHTML(member.member_id)}</td>
 
-      <td>
-        ${escapeHTML(member.full_name || "")}
-      </td>
+      <td>${escapeHTML(member.full_name)}</td>
 
-      <td>
-        ${escapeHTML(member.passport_number || "")}
-      </td>
+      <td>${escapeHTML(member.passport_number)}</td>
 
-      <td>
-        ${formatDate(member.birthday)}
-      </td>
+      <td>${escapeHTML(formatDate(member.birthday))}</td>
 
-      <td>
-        ${escapeHTML(member.contact_number || "")}
-      </td>
+      <td>${escapeHTML(member.contact_number)}</td>
 
       <td>
         <span class="status">
-          ${escapeHTML(member.membership_status || "")}
+          ${escapeHTML(member.membership_status)}
         </span>
       </td>
 
       <td>
         <div class="action-buttons">
 
-          <button
-            type="button"
+          <button type="button"
             class="view-button"
-            onclick="viewMemberDetails(${member.id})"
-          >
+            data-action="view"
+            data-id="${escapeHTML(member.id)}">
             View Details
           </button>
 
-          <button
-            type="button"
+          <button type="button"
             class="edit-button"
-            onclick="editMember(${member.id})"
-          >
+            data-action="edit"
+            data-id="${escapeHTML(member.id)}">
             Edit
           </button>
 
-          <button
-            type="button"
+          <button type="button"
             class="delete-button"
-            onclick="deleteMember(${member.id})"
-          >
+            data-action="delete"
+            data-id="${escapeHTML(member.id)}">
             Delete
           </button>
 
@@ -631,822 +678,194 @@ async function displayMembers(members) {
   }
 }
 
-// =========================
+// ==========================================
+// MEMBER RECORD ACTIONS
+// ==========================================
+
+membersTableBody.addEventListener("click", async function(event) {
+  const button = event.target.closest("button[data-action]");
+
+  if (!button) return;
+
+  const id = button.dataset.id;
+  const action = button.dataset.action;
+
+  if (action === "view") {
+    await viewMemberDetails(id);
+  }
+
+  if (action === "edit") {
+    await editMember(id);
+  }
+
+  if (action === "delete") {
+    await deleteMember(id);
+  }
+});
+
+// ==========================================
 // VIEW MEMBER DETAILS
-// =========================
+// ==========================================
 
 async function viewMemberDetails(id) {
-  const { data: member, error } = await supabaseClient
-    .from("members")
-    .select("*")
-    .eq("id", id)
-    .single();
+  try {
+    const { data: member, error } = await supabaseClient
+      .from("members")
+      .select("*")
+      .eq("id", id)
+      .single();
 
-  if (error) {
-    alert("Unable to load member details: " + error.message);
-    return;
-  }
+    if (error) throw error;
 
-  currentDetailsMemberId = member.id;
+    currentDetailsMemberId = member.id;
 
-  detailsPhoto.innerHTML = `
-    <div class="no-photo">
-      Loading Photo...
-    </div>
-  `;
-
-  if (member.photo_url) {
-    const signedUrl = await resolveMemberPhoto(member.photo_url);
-
-    if (signedUrl) {
-      // Create the image element directly instead of injecting the signed
-      // URL through innerHTML. This is more reliable for Supabase signed URLs.
-      const detailsImage = document.createElement("img");
-
-      detailsImage.className = "member-details-photo-image";
-      detailsImage.alt = "Member Photo";
-      detailsImage.loading = "eager";
-      detailsImage.decoding = "async";
-
-      detailsImage.addEventListener("error", function () {
-        detailsPhoto.innerHTML = `
-          <div class="no-photo">
-            Photo unavailable
-          </div>
-        `;
-      }, { once: true });
-
-      detailsImage.addEventListener("load", function () {
-        detailsPhoto.classList.add("photo-loaded");
-      }, { once: true });
-
-      detailsPhoto.innerHTML = "";
-      detailsPhoto.appendChild(detailsImage);
-
-      // Set src as a DOM property so the complete signed URL is preserved.
-      detailsImage.src = signedUrl;
-    } else {
-      detailsPhoto.innerHTML = `
-        <div class="no-photo">
-          Photo unavailable
-        </div>
-      `;
-    }
-  } else {
     detailsPhoto.innerHTML = `
-      <div class="no-photo">
-        No Photo
-      </div>
+      <div class="no-photo">Loading Photo...</div>
     `;
-  }
 
-  detailsMemberId.textContent =
-    member.member_id || "-";
+    if (member.photo_url) {
+      const url = await resolveMemberPhoto(member.photo_url);
 
-  detailsFullName.textContent =
-    member.full_name || "-";
+      if (url) {
+        const img = document.createElement("img");
 
-  detailsPassport.textContent =
-    member.passport_number || "-";
+        img.className = "member-details-photo-image";
+        img.alt = "Member Photo";
+        img.src = url;
 
-  detailsBirthday.textContent =
-    formatDate(member.birthday);
+        detailsPhoto.innerHTML = "";
+        detailsPhoto.appendChild(img);
 
-  detailsCountry.textContent =
-    member.country_of_work || "-";
+      } else {
+        detailsPhoto.innerHTML =
+          `<div class="no-photo">Photo unavailable</div>`;
+      }
 
-  detailsContact.textContent =
-    member.contact_number || "-";
-
-  detailsAddress.textContent =
-    member.address || "-";
-
-  detailsEmergencyPerson.textContent =
-    member.emergency_contact_person || "-";
-
-  detailsEmergencyNumber.textContent =
-    member.emergency_contact_number || "-";
-
-  detailsStatus.textContent =
-    member.membership_status || "-";
-
-  memberDetailsModal.classList.remove("hidden");
-}
-
-// =========================
-// PRINT INDIVIDUAL MEMBER - FULL DETAILS
-// =========================
-
-async function printMemberDetails(id) {
-  const { data: member, error } = await supabaseClient
-    .from("members")
-    .select("*")
-    .eq("id", id)
-    .single();
-
-  if (error) {
-    alert("Unable to load member for printing: " + error.message);
-    return;
-  }
-
-  let photoHtml = `
-    <div class="print-no-photo">
-      No Photo
-    </div>
-  `;
-
-  if (member.photo_url) {
-    const signedUrl = await resolveMemberPhoto(member.photo_url);
-
-    if (signedUrl) {
-      photoHtml = `
-        <img
-          src="${escapeHTML(signedUrl)}"
-          alt="Member Photo"
-          class="print-member-photo"
-        >
-      `;
-    }
-  }
-
-  const printWindow = window.open("", "_blank", "width=900,height=900");
-
-  if (!printWindow) {
-    alert("Please allow pop-ups in your browser to print the member record.");
-    return;
-  }
-
-  printWindow.document.write(`
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>POGA KSA - Member Record</title>
-      <style>
-        * { box-sizing: border-box; }
-        body {
-          margin: 0;
-          padding: 28px;
-          font-family: Arial, Helvetica, sans-serif;
-          color: #111827;
-          background: #fff;
-          font-size: 17px;
-          line-height: 1.55;
-        }
-        .print-header {
-          text-align: center;
-          border-bottom: 3px solid #166534;
-          padding-bottom: 16px;
-          margin-bottom: 24px;
-        }
-        .print-brand { display:flex; align-items:center; justify-content:center; gap:12px; margin-bottom:8px; }
-        .print-brand img.logo { width:90px; height:90px; object-fit:contain; }
-        .print-brand img.flag { width:48px; height:32px; object-fit:cover; border-radius:3px; }
-        .print-header h1 {
-          margin: 0;
-          font-size: 30px;
-          letter-spacing: .5px;
-        }
-        .print-header h2 {
-          margin: 5px 0 0;
-          font-size: 22px;
-        }
-        .print-header p {
-          margin: 5px 0 0;
-          font-size: 15px;
-          color: #4b5563;
-        }
-        .top {
-          display: flex;
-          gap: 25px;
-          align-items: flex-start;
-          margin-bottom: 24px;
-        }
-        .photo-box {
-          width: 150px;
-          min-width: 150px;
-          height: 180px;
-          border: 1px solid #9ca3af;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          overflow: hidden;
-        }
-        .print-member-photo {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-        .print-no-photo { color: #6b7280; font-size: 15px; }
-        .identity { flex: 1; }
-        .identity h3 { margin: 0 0 12px; font-size: 24px; }
-        .record-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 12px 22px;
-        }
-        .field {
-          border-bottom: 1px solid #d1d5db;
-          padding: 8px 0;
-        }
-        .field.full { grid-column: 1 / -1; }
-        .label {
-          display: block;
-          font-size: 13px;
-          font-weight: 700;
-          text-transform: uppercase;
-          color: #4b5563;
-          margin-bottom: 2px;
-        }
-        .value {
-          display: block;
-          font-size: 18px;
-          font-weight: 600;
-          overflow-wrap: anywhere;
-        }
-        .footer {
-          margin-top: 30px;
-          padding-top: 12px;
-          border-top: 1px solid #d1d5db;
-          font-size: 13px;
-          color: #6b7280;
-          text-align: center;
-        }
-        @media print {
-          body { padding: 10mm; font-size: 15pt; }
-          .no-print { display: none !important; }
-          @page { margin: 10mm; size: A4; }
-        }
-        @media (max-width: 650px) {
-          body { padding: 16px; }
-          .top { flex-direction: column; }
-          .record-grid { grid-template-columns: 1fr; }
-          .field.full { grid-column: auto; }
-        }
-      </style>
-    </head>
-    <body>
-      <div class="print-header">
-        <div class="print-brand">
-          <img src="${SAUDI_FLAG_URL}" class="flag" alt="Saudi Arabia">
-          <img src="${LOGO_URL}" class="logo" alt="POGA KSA">
-          <img src="${PH_FLAG_URL}" class="flag" alt="Philippines">
-        </div>
-        <h1>POGA KSA CHAPTER</h1>
-        <h2>Individual Member Record</h2>
-        <p>Full Member Details</p>
-      </div>
-
-      <div class="top">
-        <div class="photo-box">${photoHtml}</div>
-        <div class="identity">
-          <h3>${escapeHTML(member.full_name || "-")}</h3>
-          <div class="field">
-            <span class="label">Member ID</span>
-            <span class="value">${escapeHTML(member.member_id || "-")}</span>
-          </div>
-          <div class="field">
-            <span class="label">Membership Status</span>
-            <span class="value">${escapeHTML(member.membership_status || "-")}</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="record-grid">
-        <div class="field">
-          <span class="label">Full Name</span>
-          <span class="value">${escapeHTML(member.full_name || "-")}</span>
-        </div>
-        <div class="field">
-          <span class="label">Passport Number</span>
-          <span class="value">${escapeHTML(member.passport_number || "-")}</span>
-        </div>
-        <div class="field">
-          <span class="label">Birthday</span>
-          <span class="value">${escapeHTML(formatDate(member.birthday))}</span>
-        </div>
-        <div class="field">
-          <span class="label">Country of Work Abroad</span>
-          <span class="value">${escapeHTML(member.country_of_work || "-")}</span>
-        </div>
-        <div class="field full">
-          <span class="label">Philippine Address</span>
-          <span class="value">${escapeHTML(member.address || "-")}</span>
-        </div>
-        <div class="field">
-          <span class="label">Contact Number</span>
-          <span class="value">${escapeHTML(member.contact_number || "-")}</span>
-        </div>
-        <div class="field">
-          <span class="label">Emergency Contact Person</span>
-          <span class="value">${escapeHTML(member.emergency_contact_person || "-")}</span>
-        </div>
-        <div class="field">
-          <span class="label">Emergency Contact Number</span>
-          <span class="value">${escapeHTML(member.emergency_contact_number || "-")}</span>
-        </div>
-      </div>
-
-      <div class="footer">
-        POGA KSA Management System &bull; Individual Member Record
-      </div>
-
-      <script>
-        window.onload = function () {
-          setTimeout(function () { window.print(); }, 300);
-        };
-      <\/script>
-    </body>
-    </html>
-  `);
-
-  printWindow.document.close();
-}
-
-// =========================
-// PRINT OVERALL RECORDS
-// =========================
-
-async function printAllMembers() {
-  const { data: members, error } = await supabaseClient
-    .from("members")
-    .select("*");
-
-  if (error) {
-    alert("Unable to load members for printing: " + error.message);
-    return;
-  }
-
-  members.sort((a, b) => {
-    const numberA = parseInt(a.member_id, 10);
-    const numberB = parseInt(b.member_id, 10);
-
-    if (!Number.isNaN(numberA) && !Number.isNaN(numberB)) {
-      return numberA - numberB;
+    } else {
+      detailsPhoto.innerHTML =
+        `<div class="no-photo">No Photo</div>`;
     }
 
-    return String(a.member_id || "").localeCompare(
-      String(b.member_id || ""),
-      undefined,
-      { numeric: true, sensitivity: "base" }
-    );
-  });
+    detailsMemberId.textContent = member.member_id || "-";
+    detailsFullName.textContent = member.full_name || "-";
+    detailsPassport.textContent = member.passport_number || "-";
+    detailsBirthday.textContent = formatDate(member.birthday);
+    detailsCountry.textContent = member.country_of_work || "-";
+    detailsContact.textContent = member.contact_number || "-";
+    detailsAddress.textContent = member.address || "-";
 
-  const rows = members.map((member, index) => `
-    <tr>
-      <td>${index + 1}</td>
-      <td>${escapeHTML(member.full_name || "-")}</td>
-      <td>${escapeHTML(member.passport_number || "-")}</td>
-      <td>${escapeHTML(member.address || "-")}</td>
-      <td>${escapeHTML(member.contact_number || "-")}</td>
-    </tr>
-  `).join("");
+    detailsEmergencyPerson.textContent =
+      member.emergency_contact_person || "-";
 
-  const printWindow = window.open("", "_blank", "width=1100,height=900");
+    detailsEmergencyNumber.textContent =
+      member.emergency_contact_number || "-";
 
-  if (!printWindow) {
-    alert("Please allow pop-ups in your browser to print the records.");
-    return;
+    detailsStatus.textContent =
+      member.membership_status || "-";
+
+    memberDetailsModal.classList.remove("hidden");
+
+  } catch (error) {
+    alert("Unable to load member details: " + error.message);
   }
-
-  printWindow.document.write(`
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>POGA KSA - Overall Member Records</title>
-      <style>
-        * { box-sizing: border-box; }
-        body {
-          margin: 0;
-          padding: 25px;
-          font-family: Arial, Helvetica, sans-serif;
-          color: #111827;
-          background: #fff;
-          font-size: 15px;
-        }
-        header {
-          text-align: center;
-          border-bottom: 3px solid #166534;
-          padding-bottom: 14px;
-          margin-bottom: 18px;
-        }
-        .print-brand { display:flex; align-items:center; justify-content:center; gap:12px; margin-bottom:8px; }
-        .print-brand img.logo { width:72px; height:72px; object-fit:contain; }
-        .print-brand img.flag { width:46px; height:31px; object-fit:cover; border-radius:3px; }
-        header h1 { margin: 0; font-size: 29px; }
-        header h2 { margin: 5px 0; font-size: 21px; }
-        header p { margin: 0; font-size: 15px; color: #4b5563; }
-        .summary {
-          margin: 0 0 16px;
-          font-size: 18px;
-          font-weight: 700;
-        }
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          table-layout: fixed;
-        }
-        th, td {
-          border: 1px solid #9ca3af;
-          padding: 9px 8px;
-          text-align: left;
-          vertical-align: top;
-          overflow-wrap: anywhere;
-        }
-        th {
-          background: #f3f4f6;
-          font-size: 14px;
-          font-weight: 800;
-        }
-        td { font-size: 15px; }
-        th:first-child, td:first-child { width: 45px; text-align: center; }
-        th:nth-child(2) { width: 21%; }
-        th:nth-child(3) { width: 17%; }
-        th:nth-child(4) { width: 42%; }
-        th:nth-child(5) { width: 16%; }
-        footer {
-          margin-top: 16px;
-          text-align: center;
-          color: #6b7280;
-          font-size: 12px;
-        }
-        @media print {
-          body { padding: 8mm; }
-          @page { margin: 8mm; size: A4 landscape; }
-          thead { display: table-header-group; }
-          tr { page-break-inside: avoid; }
-        }
-      </style>
-    </head>
-    <body>
-      <header>
-        <div class="print-brand">
-          <img src="${SAUDI_FLAG_URL}" class="flag" alt="Saudi Arabia">
-          <img src="${LOGO_URL}" class="logo" alt="POGA KSA">
-          <img src="${PH_FLAG_URL}" class="flag" alt="Philippines">
-        </div>
-        <h1>POGA KSA CHAPTER</h1>
-        <h2>Overall Member Records</h2>
-        <p>Management System</p>
-      </header>
-      <div class="summary">Total Members: ${members.length}</div>
-      <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Full Name</th>
-            <th>Passport #</th>
-            <th>Address sa Pinas</th>
-            <th>CP #</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows || `<tr><td colspan="5">No member records found.</td></tr>`}
-        </tbody>
-      </table>
-      <footer>POGA KSA Management System &bull; Overall Member Records</footer>
-      <script>
-        window.onload = function () {
-          setTimeout(function () { window.print(); }, 300);
-        };
-      <\/script>
-    </body>
-    </html>
-  `);
-
-  printWindow.document.close();
 }
 
-printAllMembersButton.addEventListener("click", printAllMembers);
-
-// =========================
-// EDIT FROM DETAILS
-// =========================
-
-detailsEditButton.addEventListener("click", async function () {
-  if (!currentDetailsMemberId) {
-    return;
-  }
-
-  const idToEdit = currentDetailsMemberId;
-
-  closeMemberDetails();
-
-  await editMember(idToEdit);
-});
-
-detailsPrintButton.addEventListener("click", async function () {
-  if (!currentDetailsMemberId) {
-    return;
-  }
-
-  await printMemberDetails(currentDetailsMemberId);
-});
-
-// =========================
-// CLOSE DETAILS MODAL
-// =========================
+// ==========================================
+// CLOSE MEMBER DETAILS
+// ==========================================
 
 function closeMemberDetails() {
   memberDetailsModal.classList.add("hidden");
   currentDetailsMemberId = null;
 }
 
-closeDetailsButton.addEventListener(
-  "click",
-  closeMemberDetails
-);
+closeDetailsButton.addEventListener("click", closeMemberDetails);
 
-detailsCloseButton.addEventListener(
-  "click",
-  closeMemberDetails
-);
+detailsCloseButton.addEventListener("click", closeMemberDetails);
 
-// Close when clicking outside modal
-memberDetailsModal.addEventListener(
-  "click",
-  function (event) {
-    if (event.target === memberDetailsModal) {
-      closeMemberDetails();
-    }
+memberDetailsModal.addEventListener("click", function(event) {
+  if (event.target === memberDetailsModal) {
+    closeMemberDetails();
   }
-);
+});
 
-// Close with ESC key
-document.addEventListener("keydown", function (event) {
+document.addEventListener("keydown", function(event) {
   if (event.key === "Escape") {
     closeMemberDetails();
   }
 });
 
-// =========================
+// ==========================================
 // EDIT MEMBER
-// =========================
+// ==========================================
 
 async function editMember(id) {
-  const { data: member, error } = await supabaseClient
-    .from("members")
-    .select("*")
-    .eq("id", id)
-    .single();
-
-  if (error) {
-    alert("Unable to load member: " + error.message);
-    return;
-  }
-
-  editingId = member.id;
-
-  formTitle.textContent = "Edit Member";
-
-  memberId.value =
-    member.member_id || "";
-
-  fullName.value =
-    member.full_name || "";
-
-  passportNumber.value =
-    member.passport_number || "";
-
-  birthday.value =
-    member.birthday || "";
-
-  country.value =
-    member.country_of_work || "";
-
-  address.value =
-    member.address || "";
-
-  contact.value =
-    member.contact_number || "";
-
-  emergencyContact.value =
-    member.emergency_contact_person || "";
-
-  emergencyNumber.value =
-    member.emergency_contact_number || "";
-
-  status.value =
-    member.membership_status || "Active";
-
-  currentPhotoUrl =
-    member.photo_url || null;
-
-  selectedPhotoFile = null;
-
-  photo.value = "";
-
-  if (member.photo_url) {
-    const signedUrl = await resolveMemberPhoto(member.photo_url);
-
-    if (signedUrl) {
-      photoPreview.innerHTML = `
-        <img
-          src="${escapeHTML(signedUrl)}"
-          alt="Current Member Photo"
-          class="member-photo"
-        >
-      `;
-    } else {
-      photoPreview.innerHTML = `
-        <div class="no-photo">
-          Photo unavailable
-        </div>
-      `;
-    }
-  } else {
-    photoPreview.innerHTML = `
-      <div class="no-photo">
-        No Photo
-      </div>
-    `;
-  }
-
-  saveButton.textContent = "Update Member";
-  cancelEditButton.classList.remove("hidden");
-
-  window.scrollTo({
-    top: 0,
-    behavior: "smooth",
-  });
-}
-
-// =========================
-// CANCEL EDIT
-// =========================
-
-cancelEditButton.addEventListener(
-  "click",
-  function () {
-    resetForm();
-  }
-);
-
-// =========================
-// DELETE MEMBER
-// =========================
-
-async function deleteMember(id) {
-  const confirmed = confirm(
-    "Are you sure you want to delete this member?"
-  );
-
-  if (!confirmed) {
-    return;
-  }
-
-  const { error } = await supabaseClient
-    .from("members")
-    .delete()
-    .eq("id", id);
-
-  if (error) {
-    alert("Unable to delete member: " + error.message);
-    return;
-  }
-
-  alert("Member deleted successfully.");
-
-  await loadMembers();
-}
-
-// =========================
-// SEARCH MEMBERS
-// =========================
-
-searchInput.addEventListener(
-  "input",
-  async function () {
-    const searchValue =
-      searchInput.value.trim();
-
-    if (!searchValue) {
-      await loadMembers();
-      return;
-    }
-
-    const safeSearch =
-      escapeSearchValue(searchValue);
-
-    const { data, error } = await supabaseClient
+  try {
+    const { data: member, error } = await supabaseClient
       .from("members")
       .select("*")
-      .or(
-        `member_id.ilike.%${safeSearch}%,full_name.ilike.%${safeSearch}%,passport_number.ilike.%${safeSearch}%,contact_number.ilike.%${safeSearch}%`
-      );
+      .eq("id", id)
+      .single();
 
-    if (error) {
-      console.error(error);
-      return;
+    if (error) throw error;
+
+    editingId = member.id;
+
+    formTitle.textContent = "Edit Member";
+
+    memberId.value = member.member_id || "";
+    fullName.value = member.full_name || "";
+    passportNumber.value = member.passport_number || "";
+    birthday.value = member.birthday || "";
+    country.value = member.country_of_work || "";
+    address.value = member.address || "";
+    contact.value = member.contact_number || "";
+
+    emergencyContact.value =
+      member.emergency_contact_person || "";
+
+    emergencyNumber.value =
+      member.emergency_contact_number || "";
+
+    status.value = member.membership_status || "Active";
+
+    currentPhotoUrl = member.photo_url || null;
+    selectedPhotoFile = null;
+
+    photo.value = "";
+
+    if (member.photo_url) {
+      const url = await resolveMemberPhoto(member.photo_url);
+
+      photoPreview.innerHTML = url
+        ? `<img src="${escapeHTML(url)}" class="member-photo" alt="Current Photo">`
+        : `<div class="no-photo">Photo unavailable</div>`;
+
+    } else {
+      photoPreview.innerHTML =
+        `<div class="no-photo">No Photo</div>`;
     }
 
-    /*
-      Keep search results in the same
-      ascending Member ID order.
-    */
+    saveButton.textContent = "Update Member";
 
-    data.sort((a, b) => {
-      const numberA = parseInt(a.member_id, 10);
-      const numberB = parseInt(b.member_id, 10);
+    cancelEditButton.classList.remove("hidden");
 
-      if (!Number.isNaN(numberA) && !Number.isNaN(numberB)) {
-        return numberA - numberB;
-      }
-
-      return String(a.member_id || "").localeCompare(
-        String(b.member_id || ""),
-        undefined,
-        {
-          numeric: true,
-          sensitivity: "base",
-        }
-      );
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
     });
 
-    displayMembers(data);
+  } catch (error) {
+    alert("Unable to print records: " + error.message);
   }
-);
-
-// =========================
-// RESET FORM
-// =========================
-
-function resetForm() {
-  editingId = null;
-  currentPhotoUrl = null;
-  selectedPhotoFile = null;
-
-  memberForm.reset();
-
-  status.value = "Active";
-
-  formTitle.textContent = "Add Member";
-
-  saveButton.textContent = "Save Member";
-
-  cancelEditButton.classList.add("hidden");
-
-  photoPreview.innerHTML = "";
-
-  photo.value = "";
-
-  currentDetailsMemberId = null;
 }
 
-// =========================
-// FORMAT DATE
-// =========================
+printAllMembersButton.addEventListener("click", printAllMembers);
 
-function formatDate(dateString) {
-  if (!dateString) {
-    return "-";
-  }
-
-  const date = new Date(dateString);
-
-  if (Number.isNaN(date.getTime())) {
-    return dateString;
-  }
-
-  return date.toLocaleDateString(
-    "en-US",
-    {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    }
-  );
-}
-
-// =========================
-// HTML ESCAPE
-// =========================
-
-function escapeHTML(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-// =========================
-// SEARCH ESCAPE
-// =========================
-
-function escapeSearchValue(value) {
-  return String(value ?? "")
-    .replace(/[%_]/g, "\\$&")
-    .replace(/,/g, "\\,")
-    .replace(/\./g, "\\.");
-}
-
-// =========================
-// INITIAL AUTH CHECK
-// =========================
+// ==========================================
+// INITIALIZE ADMIN DASHBOARD
+// ==========================================
 
 checkAuth();
+
+console.log("POGA KSA Admin Dashboard initialized successfully.");
